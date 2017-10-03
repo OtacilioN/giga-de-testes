@@ -13,24 +13,28 @@
 #define AVALIAR_TENSAO  // Se a giga de testes deve além de informar, avaliar as tensões lidas
 #define USAR_PROXIMOS   // Se os pinos semelhantes estiverem em sequência na placa, por exemplo pinos de 0 até 3v3 da porta A0 até A2, pinos de 0 até 10v da porta A3 até A4 e pino de alimentação na porta A5 
 #define CHECKAR_ALIMENTACAO // Se houverem pinos de alimentação cuja tensão não deve variar
+#define NOMEAR_PLACAS
 // Fim dos defines de funções
 
 // Modificar de acordo com a sua placa
-#define MAIOR_DIGITAL 13 // 13 Para Arduino Uno, 53 para Arduino Mega
+#define MAIOR_DIGITAL 0 // 13 Para Arduino Uno, 53 para Arduino Mega (Analise digital ainda não implementada)
 #define MAIOR_ANALOGICA 5  // 5 para Arduino Uno, 15 para Arduino Mega
 #define TOTAL_PINOS (MAIOR_ANALOGICA + MAIOR_DIGITAL) 
+#define QUANTIDADE_PLACAS 80 // 80 para 80 placas de testes
+#define FAIXA_TOLERANCIA 0.1 // 0.1 indica 10% de tolerancia
 
 // Inicio do código, não é necessário parametrizar mais nada pelo código a partir daqui
 
-unsigned char x, aux, pinos;
+unsigned int x, y;
+unsigned char aux, pinos;
 unsigned char cont = 0;
-float tensao_medida[TOTAL_PINOS];
+float tensao_medida[TOTAL_PINOS][3];
 
 #ifdef AVALIAR_TENSAO
     float tensao_referencia[TOTAL_PINOS];
 
     #ifdef USAR_PROXIMOS
-        unsigned char semelhantes[TOTAL_PINOS];
+        unsigned char proximos = 0;
     #endif
 #endif
 
@@ -44,7 +48,12 @@ float tensao_medida[TOTAL_PINOS];
     #endif
 #endif 
 
+#ifdef NOMEAR_PLACAS
+    unsigned int nomes[QUANTIDADE_PLACAS];
+#endif
+
 void parametrizar();
+void testar();
 
 void setup()
 {
@@ -54,6 +63,11 @@ void setup()
         pinMode(x, INPUT);
     
     parametrizar();
+    x = 0;
+    while(x < QUANTIDADE_PLACAS){
+        testar();   
+    }   
+    
 }
 
 void loop()
@@ -64,7 +78,7 @@ void loop()
 void parametrizar(){
 
     x = 0;
-    Serial.print("Digite quantos pinos serão lidos: ");
+    Serial.print("Digite quantos pinos analogicos serão lidos: ");
     pinos = Serial.read();
     
     // Aquisição das tensões de referência
@@ -77,7 +91,13 @@ void parametrizar(){
                 Serial.print("Por quantos próximos pinos usar esta tensão de referência: ");
                 aux = (int) Serial.read();
                 cont = cont + aux;
-                semelhantes[x] = aux;
+                y = 0;
+                while(y < aux){
+                    x++;
+                    tensao_referencia[x] = tensao_referencia[x-1];
+                    y++;
+                }
+                
             #else
                 cont++;
             #endif
@@ -104,4 +124,48 @@ void parametrizar(){
             }            
         #endif
     #endif 
+}
+
+void testar(){
+    y = aux = 0;
+
+    #ifdef NOMEAR_PLACAS
+        Serial.print("Digite o código numérico da placa: ");
+        nomes[x] = Serial.read();      
+    #endif
+    Serial.print("Aterre todos os pinos de sinais, e deixe a placa alimentada, então envie algum caractere na serial: ");
+    Serial.read();
+
+    while(y < pinos){
+        tensao_medida[y][0] = map(analogRead(A0+y), 0, 1023, 0, tensao_referencia[y]);
+        Serial.print("Foi medido na porta A"); Serial.print(y);  Serial.print(" uma tensao de: "); Serial.print(tensao_medida[y][0]); Serial.println(" volts");
+        y++;
+    }
+    #ifdef USAR_PROXIMOS
+        y = 0;
+        while(y < pino_alimentacao)
+        {
+            Serial.print("passe o pino A"); Serial.print(y); Serial.print("para a tensão máxima, aterre os demais, então envie algum caractere na serial:");
+            Serial.read();
+            tensao_medida[y][1] = map(analogRead(A0+y), 0, 1023, 0, tensao_referencia[y]);
+            y++;
+        }
+        while(y < pinos){
+            tensao_medida[y][1] = map(analogRead(A0+y), 0, 1023, 0, tensao_referencia[y]);
+            y++;
+        }
+
+        y = 0;
+        Serial.print("Passe todos os pinos para a tensão máxima, e deixe a placa alimentada, então envie algum caractere na serial: ");
+        Serial.read();
+
+        while(y < pinos){
+            tensao_medida[y][2] = map(analogRead(A0+y), 0, 1023, 0, tensao_referencia[y]);
+            y++;
+        }
+
+
+    #else // implementar depois
+    #endif
+        
 }
